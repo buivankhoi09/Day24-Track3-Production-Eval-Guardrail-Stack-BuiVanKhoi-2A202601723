@@ -1,70 +1,59 @@
-# Failure Cluster Analysis — Phase A
+# Failure Cluster Analysis — Phase A (Online + Qdrant)
 
-**Sinh viên:** [Họ Tên]  
-**Ngày:** [Ngày làm lab]
+**Sinh viên:** Bùi Văn Khôi  
+**Ngày:** 2026-08-26  
 
----
-
-## 1. Aggregate RAGAS Scores theo Distribution
+## 1. Aggregate RAGAS scores
 
 | Metric | factual | multi_hop | adversarial |
-|---|---|---|---|
-| faithfulness | ? | ? | ? |
-| answer_relevancy | ? | ? | ? |
-| context_precision | ? | ? | ? |
-| context_recall | ? | ? | ? |
-| **avg_score** | ? | ? | ? |
+|---|---:|---:|---:|
+| faithfulness | 0.9250 | 0.5942 | 0.6000 |
+| answer_relevancy | 0.7931 | 0.6634 | 0.5038 |
+| context_precision | 0.9792 | 0.8917 | 0.9417 |
+| context_recall | 0.9250 | 0.7625 | 0.7167 |
+| **avg_score** | **0.9056** | **0.7279** | **0.6905** |
 
----
+## 2. Bottom 10 questions
 
-## 2. Bottom 10 Questions
+| Rank | ID | Distribution | avg_score | Worst metric |
+|---:|---:|---|---:|---|
+| 1 | 39 | multi_hop | 0.0000 | faithfulness |
+| 2 | 33 | multi_hop | 0.2083 | faithfulness |
+| 3 | 48 | adversarial | 0.3125 | faithfulness |
+| 4 | 43 | adversarial | 0.4167 | faithfulness |
+| 5 | 50 | adversarial | 0.4167 | faithfulness |
+| 6 | 44 | adversarial | 0.4583 | faithfulness |
+| 7 | 9 | factual | 0.5000 | faithfulness |
+| 8 | 21 | multi_hop | 0.5833 | answer_relevancy |
+| 9 | 31 | multi_hop | 0.6207 | faithfulness |
+| 10 | 30 | multi_hop | 0.6250 | answer_relevancy |
 
-| Rank | Distribution | Question | avg_score | worst_metric |
-|---|---|---|---|---|
-| 1 | | | | |
-| 2 | | | | |
-| ... | | | | |
+## 3. Failure cluster matrix
 
----
+| Worst metric | factual | multi_hop | adversarial | Total |
+|---|---:|---:|---:|---:|
+| faithfulness | 2 | 10 | 4 | 16 |
+| answer_relevancy | 15 | 5 | 1 | 21 |
+| context_precision | 1 | 0 | 0 | 1 |
+| context_recall | 2 | 5 | 5 | 12 |
 
-## 3. Failure Cluster Matrix
+**Dominant metric:** answer_relevancy (21 cases).  
+**Lowest distribution score:** adversarial (0.6905).  
+**Most failure-count cases:** factual (20 cases).
 
-*(Mỗi ô = số câu có worst_metric = row, thuộc distribution = col)*
+## 4. Root-cause analysis
 
-| worst_metric | factual | multi_hop | adversarial | Total |
-|---|---|---|---|---|
-| faithfulness | | | | |
-| answer_relevancy | | | | |
-| context_precision | | | | |
-| context_recall | | | | |
+Qdrant dense retrieval and reranking produced strong context precision and recall, especially on factual questions. Answer relevancy is now the dominant worst-metric cluster, while faithfulness remains the main source of the lowest individual scores. Multi-hop and adversarial questions are weaker because they require combining documents or distinguishing v2023/v2024 and v1/v2. The most difficult examples are the password comparison, trial-period benefits, Manager allowance/leave calculation and personal VPN question.
 
----
+## 5. Suggested fixes
 
-## 4. Dominant Failure Analysis
-
-**Dominant distribution:** [factual / multi_hop / adversarial]  
-**Dominant metric:** [faithfulness / answer_relevancy / context_precision / context_recall]
-
-**Lý do phân tích:**
-
-> [Viết 3-5 câu giải thích tại sao distribution này hay bị failure, 
->  tại sao metric này thấp nhất trong corpus HR policy tiếng Việt]
-
----
-
-## 5. Suggested Fixes
-
-| Metric yếu | Root cause | Suggested fix |
+| Weak metric | Root cause | Suggested fix |
 |---|---|---|
-| faithfulness | LLM hallucinating | |
-| context_recall | Missing relevant chunks | |
-| context_precision | Too many irrelevant chunks | |
-| answer_relevancy | Answer doesn't match question | |
+| faithfulness | Generator adds unsupported policy details | Add citations, strict grounded prompt and abstention rule |
+| context_recall | Version or second-hop evidence missed | Add query expansion and version-aware parent retrieval |
+| context_precision | Similar policy variants | Keep reranker and add source/version metadata filters |
+| answer_relevancy | Answer misses sub-question intent | Require a direct answer for every requested field and calculation |
 
----
+## 6. Adversarial distribution
 
-## 6. Nhận xét về Adversarial Distribution
-
-> [So sánh avg_score của adversarial vs factual vs multi_hop.
->  Pipeline có bị "nhầm" bởi version conflicts (v2023 vs v2024) không?
->  Câu nào trong bottom 10 rơi vào adversarial? Tại sao?]
+Adversarial remains the weakest group despite high context precision. IDs 48, 43, 50 and 44 are in the bottom 10; they represent eligibility, password and personal-VPN policy traps. The next iteration should prioritize current-policy version metadata, contradiction checks and grounded refusal when evidence is ambiguous.

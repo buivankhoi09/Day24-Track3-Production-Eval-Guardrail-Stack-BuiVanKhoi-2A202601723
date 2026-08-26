@@ -15,6 +15,8 @@ def check(label: str, condition: bool, detail: str = "") -> bool:
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     print("=" * 60)
     print("CHECK LAB 24: Eval + Guardrail Stack")
     print("=" * 60)

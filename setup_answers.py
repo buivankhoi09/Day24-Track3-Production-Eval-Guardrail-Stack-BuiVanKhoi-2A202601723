@@ -53,12 +53,15 @@ def build_pipeline():
                 "metadata": {**child.metadata, "parent_id": child.parent_id},
             })
 
-    enriched = enrich_chunks(all_chunks)
-    if enriched:
-        all_chunks = [{"text": e.enriched_text, "metadata": e.auto_metadata} for e in enriched]
-        print(f"  ✓ Enriched {len(enriched)} chunks ({time.time()-t0:.1f}s)")
+    if os.getenv("RAG_DISABLE_ENRICHMENT") == "1":
+        print(f"  ✓ Enrichment disabled for this run; using {len(all_chunks)} raw chunks")
     else:
-        print(f"  ✓ Using {len(all_chunks)} raw chunks (M5 not implemented or no API key)")
+        enriched = enrich_chunks(all_chunks)
+        if enriched:
+            all_chunks = [{"text": e.enriched_text, "metadata": e.auto_metadata} for e in enriched]
+            print(f"  ✓ Enriched {len(enriched)} chunks ({time.time()-t0:.1f}s)")
+        else:
+            print(f"  ✓ Using {len(all_chunks)} raw chunks (M5 not implemented or no API key)")
 
     print("\n[2/3] Indexing (BM25 + Dense)...")
     t0 = time.time()
@@ -102,6 +105,8 @@ def run_query(q: str, search, reranker, top_k: int) -> tuple[str, list[str]]:
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     print("=" * 60)
     print("LAB 24 SETUP — Generating answers for 50 questions")
     print("=" * 60)

@@ -1,99 +1,51 @@
 # CI/CD Blueprint: RAG Eval + Guardrail Stack
 
-**Sinh viên:** [Họ Tên]  
-**Ngày:** [Ngày làm lab]
-
----
+**Sinh viên:** Bùi Văn Khôi  
+**Ngày chạy online:** 2026-08-26  
 
 ## Guard Stack Architecture
 
-```
-User Input
-    │
-    ▼ (~?ms P95)
-[Presidio PII Scan]
-    │ block if: VN_CCCD / VN_PHONE / EMAIL detected
-    │ action:   return 400 + "PII detected in query"
-    ▼ (~?ms P95)
-[NeMo Input Rail]
-    │ block if: off-topic / jailbreak / prompt injection
-    │ action:   return 503 + refuse message
-    ▼
-[RAG Pipeline (Day 18)]
-    │ M1 Chunk → M2 Search → M3 Rerank → GPT-4o-mini
-    ▼
-[NeMo Output Rail]
-    │ flag if:  PII in response / sensitive content
-    │ action:   replace with safe response
-    ▼
-User Response
-```
+`Input → PII scan → input rail → Day 18 RAG → output rail → response`
 
----
+| Layer | Tool | Latency P95 | Failure action |
+|---|---|---:|---|
+| PII detection | Presidio-compatible VN regex layer | 0.01 ms | Reject and log |
+| Topic/jailbreak | Input rail rules | 0.01 ms | Reject with reason |
+| RAG pipeline | Day 18 BM25 + dense Qdrant + reranker + GPT-4o-mini | online | Fallback / retry |
+| Output check | PII and sensitive-output rail | local check | Redact and log |
 
-## Latency Budget
+## Online Evaluation Results
 
-*(Điền từ kết quả Task 12 — measure_p95_latency())*
+- Answers: **50/50** generated with OpenAI API after indexing 116 chunks in Qdrant.
+- Retrieval: BM25 + dense embedding + reranker completed successfully; M5 enrichment was disabled to avoid 116 extra API calls.
+- RAGAS: **200 online metric evaluations** completed.
+- Adversarial suite: **20/20 passed (100%)**.
+- Guard P50/P95/P99: **0.01 / 0.02 / 0.03 ms**.
+- Cohen's κ: **0.4000** against the 10 human labels.
 
-| Layer | P50 (ms) | P95 (ms) | P99 (ms) | Budget |
-|---|---|---|---|---|
-| Presidio PII | ? | ? | ? | <10ms |
-| NeMo Input Rail | ? | ? | ? | <300ms |
-| RAG Pipeline | ? | ? | ? | <2000ms |
-| NeMo Output Rail | ? | ? | ? | <300ms |
-| **Total Guard** | ? | **?** | ? | **<500ms** |
+| Distribution | Faithfulness | Answer relevancy | Context precision | Context recall | Avg |
+|---|---:|---:|---:|---:|---:|
+| factual | 0.9250 | 0.7931 | 0.9792 | 0.9250 | 0.9056 |
+| multi_hop | 0.5942 | 0.6634 | 0.8917 | 0.7625 | 0.7279 |
+| adversarial | 0.6000 | 0.5038 | 0.9417 | 0.7167 | 0.6905 |
 
-**Budget OK?** [ ] Yes / [ ] No  
-**Comment:** [Nếu vượt budget, layer nào là bottleneck và cách tối ưu?]
-
----
-
-## CI/CD Gates (phải pass trước khi merge to main)
+## CI/CD Gates
 
 ```yaml
-# .github/workflows/rag_eval.yml
-- name: RAGAS Quality Gate
+- name: Tests
+  run: pytest tests/ -q
+- name: RAGAS quality gate
   run: python src/phase_a_ragas.py
-  env:
-    MIN_FAITHFULNESS: 0.75
-    MIN_AVG_SCORE: 0.65
-
-- name: Guardrail Gate
-  run: pytest tests/test_phase_c.py -k "test_adversarial_suite_pass_rate"
-  # phải ≥ 15/20 (75%)
-
-- name: Latency Gate
-  run: python -c "from src.phase_c_guard import measure_p95_latency; ..."
-  # P95 total < 500ms
+- name: Guardrail gate
+  run: python src/phase_c_guard.py
 ```
 
----
+Merge gates: all tests pass, faithfulness ≥ 0.75, adversarial pass rate ≥ 90%, and total guard P95 < 500 ms. This run passes the guardrail and latency gates; factual faithfulness passes, while multi-hop and adversarial faithfulness need improvement.
 
-## Monitoring Dashboard (production)
+## Monitoring
 
-| Metric | Alert Threshold | Action |
-|---|---|---|
-| RAGAS faithfulness (daily sample) | < 0.70 | Page on-call |
-| Adversarial block rate | < 80% | Review new attack patterns |
-| Guard P95 latency | > 600ms | Scale NeMo model |
-| PII detected count | spike >10/hour | Security alert |
+Alert on faithfulness < 0.70, adversarial pass rate < 80%, guard P95 > 600 ms, or PII detections >10/hour. Store IDs, rail reason, policy version, latency and redaction outcome; never log raw PII.
 
----
+## Production assessment
 
-## Kết quả thực tế từ Lab
-
-| | Kết quả |
-|---|---|
-| RAGAS avg_score (50q) | ? |
-| Worst metric | ? |
-| Dominant failure distribution | ? |
-| Cohen's κ | ? |
-| Adversarial pass rate | ? / 20 |
-| Guard P95 latency | ? ms |
-
----
-
-## Nhận xét & Cải tiến
-
-> [Viết 3-5 câu về: điều gì hoạt động tốt, điều gì cần cải thiện,
->  nếu deploy production thực sự bạn sẽ thay đổi gì trong stack này?]
+Enabling Qdrant, dense retrieval and reranking improved context precision/recall compared with the BM25-only run. The remaining weakness is faithful handling of multi-hop and version-conflict questions. Strengthen version-aware filters, require citations or source snippets in the answer prompt, and consider enabling M5 enrichment after measuring its quality gain against its API cost.
