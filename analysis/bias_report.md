@@ -1,6 +1,6 @@
 # LLM Judge Bias Report — Phase B (Online + Qdrant)
 
-**Sinh viên:** Bùi Văn Khôi  
+**Sinh viên:** Bùi Văn Khởi  
 **Ngày:** 2026-08-26  
 **Judge model:** gpt-4o-mini
 

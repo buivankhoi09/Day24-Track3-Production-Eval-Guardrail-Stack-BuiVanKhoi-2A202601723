@@ -1,6 +1,6 @@
 # Failure Cluster Analysis — Phase A (Online + Qdrant)
 
-**Sinh viên:** Bùi Văn Khôi  
+**Sinh viên:** Bùi Văn Khởi  
 **Ngày:** 2026-08-26  
 
 ## 1. Aggregate RAGAS scores

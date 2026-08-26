@@ -1,6 +1,6 @@
 # CI/CD Blueprint: RAG Eval + Guardrail Stack
 
-**Sinh viên:** Bùi Văn Khôi  
+**Sinh viên:** Bùi Văn Khởi  
 **Ngày chạy online:** 2026-08-26  
 
 ## Guard Stack Architecture
